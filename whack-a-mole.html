@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打地鼠游戏</title>
+    <style>
+        body {
+            /* 设置字体和布局 */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            /* 背景渐变色 */
+            background: linear-gradient(135deg, #e0f7fa, #80deea);
+            padding: 10px;
+            box-sizing: border-box;
+            /* 禁用滚动和触摸滚动 */
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .container {
+            /* 设置容器样式 */
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            max-width: 90%;
+            width: 400px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .scoreboard, .history {
+            /* 设置记分板和历史记录样式 */
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #00796b;
+            background-color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+        }
+
+        .game-board {
+            /* 设置游戏板样式 */
+            display: grid;
+            grid-gap: 8px;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+
+        .hole {
+            /* 设置洞口样式为黑色 */
+            width: 100%;
+            height: 0;
+            padding-bottom: 100%;
+            background-color: #000000; /* 黑色 */
+            border-radius: 50%;
+            position: relative;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            outline: none; /* 移除点击时的默认样式 */
+            -webkit-tap-highlight-color: transparent; /* 移除移动端点击高亮 */
+        }
+
+        .mole {
+            /* 设置地鼠样式为图片，填满整个洞口 */
+            width: 100%;
+            height: 100%;
+            background-image: url('C:/Users/15322/Desktop/gpt/地鼠.jpg');
+            background-size: cover;
+            background-position: center;
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none;
+            transition: transform 0.3s, opacity 0.3s;
+        }
+
+        .mole:hover {
+            /* 鼠标悬停时的地鼠效果 */
+            transform: scale(1.1);
+        }
+
+        .mole.clicked {
+            /* 地鼠被点击时的动画 */
+            animation: pop 0.3s forwards;
+        }
+
+        @keyframes pop {
+            /* 定义地鼠点击动画 */
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.3);
+                opacity: 0.5;
+            }
+            100% {
+                transform: scale(0);
+                opacity: 0;
+            }
+        }
+
+        .mode-select, .difficulty-select, .controls {
+            /* 设置选择和控制按钮样式 */
+            margin-bottom: 15px;
+            width: 100%;
+        }
+
+        select, button {
+            /* 设置选择框和按钮样式 */
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #00796b;
+            color: #ffffff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 200px;
+            margin: 5px 0;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            /* 按钮悬停效果 */
+            background-color: #004d40;
+        }
+
+        .hidden {
+            /* 隐藏元素 */
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="mode-select">
+            <label for="mode">选择模式:</label>
+            <select id="mode">
+                <option value="normal">普通模式</option>
+                <option value="fast">快速模式</option>
+            </select>
+        </div>
+        <div class="difficulty-select">
+            <label for="difficulty">选择难度:</label>
+            <select id="difficulty">
+                <option value="easy">简单</option>
+                <option value="medium">普通</option>
+                <option value="hard">困难</option>
+                <option value="hell">地狱</option>
+            </select>
+        </div>
+        <div class="scoreboard">
+            得分: <span id="score">0</span> | 时间: <span id="timer">60</span> 秒
+        </div>
+        <div class="history">
+            历史最高分: <span id="high-score">0</span>
+            <button id="clear-history">清除历史记录</button>
+        </div>
+        <div class="controls">
+            <button id="start-game">开始游戏</button>
+            <button id="end-game" class="hidden">结束游戏</button>
+        </div>
+        <div class="game-board" id="game-board" class="hidden">
+            <!-- 洞口将动态生成 -->
+        </div>
+    </div>
+    <audio id="hit-sound" src="打击.mp3"></audio> <!-- 点击地鼠音效 -->
+    <audio id="bg-music" src="background.mp3" loop></audio> <!-- 背景音乐 -->
+    <script>
+        // 获取页面元素
+        const scoreDisplay = document.getElementById('score');
+        const timerDisplay = document.getElementById('timer');
+        const modeSelect = document.getElementById('mode');
+        const difficultySelect = document.getElementById('difficulty');
+        const gameBoard = document.getElementById('game-board');
+        const highScoreDisplay = document.getElementById('high-score');
+        const clearHistoryButton = document.getElementById('clear-history');
+        const startGameButton = document.getElementById('start-game');
+        const endGameButton = document.getElementById('end-game');
+        const hitSound = document.getElementById('hit-sound');
+        const bgMusic = document.getElementById('bg-music');
+
+        // 初始化游戏状态
+        let score = 0;
+        let timeLeft = 60;
+        let currentMode = 'normal';
+        let currentDifficulty = 'easy';
+        let timer;
+
+        // 定义难度设置
+        const difficultySettings = {
+            easy: { speed: 1000, holes: 9 },
+            medium: { speed: 800, holes: 16 },
+            hard: { speed: 600, holes: 25 },
+            hell: { speed: 400, holes: 36 }
+        };
+
+        // 创建洞口
+        function createHoles(num) {
+            gameBoard.innerHTML = ''; // 清空之前的洞口
+            const side = Math.sqrt(num);
+            gameBoard.style.gridTemplateColumns = `repeat(${side}, 1fr)`;
+            for (let i = 0; i < num; i++) {
+                const hole = document.createElement('div');
+                hole.classList.add('hole');
+                const mole = document.createElement('div');
+                mole.classList.add('mole');
+                hole.appendChild(mole);
+                gameBoard.appendChild(hole);
+            }
+        }
+
+        // 随机选择一个洞口
+        function randomHole() {
+            const holes = document.querySelectorAll('.hole');
+            const index = Math.floor(Math.random() * holes.length);
+            return holes[index];
+        }
+
+        // 显示地鼠
+        function showMole() {
+            const hole = randomHole();
+            const mole = hole.querySelector('.mole');
+            mole.style.display = 'block';
+
+            if (currentMode === 'normal') {
+                const delay = difficultySettings[currentDifficulty].speed;
+                setTimeout(() => {
+                    mole.style.display = 'none';
+                    if (timeLeft > 0) showMole();
+                }, delay);
+            }
+        }
+
+        // 开始游戏
+        function startGame() {
+            clearInterval(timer); // 清除之前的计时器
+            currentMode = modeSelect.value;
+            currentDifficulty = difficultySelect.value;
+            score = 0;
+            scoreDisplay.textContent = score;
+            timeLeft = 60;
+            timerDisplay.textContent = timeLeft;
+
+            createHoles(difficultySettings[currentDifficulty].holes);
+
+            const holes = document.querySelectorAll('.hole');
+            holes.forEach(hole => {
+                hole.addEventListener('click', () => {
+                    const mole = hole.querySelector('.mole');
+                    if (mole.style.display === 'block') {
+                        score++;
+                        scoreDisplay.textContent = score;
+                        mole.classList.add('clicked');
+                        hitSound.currentTime = 0; // 重置音频播放时间
+                        hitSound.play().catch(error => console.error('音效播放失败:', error)); // 播放点击音效
+                        setTimeout(() => {
+                            mole.classList.remove('clicked');
+                            mole.style.display = 'none';
+                            if (currentMode === 'fast') showMole(); // 在快速模式下立即显示下一个地鼠
+                        }, 0); // 减少延迟时间
+                    }
+                });
+            });
+
+            timer = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = timeLeft;
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+            showMole();
+
+            // 播放背景音乐
+            bgMusic.play().catch(error => console.error('背景音乐播放失败:', error));
+
+            // 隐藏不必要的元素
+            modeSelect.parentElement.classList.add('hidden');
+            difficultySelect.parentElement.classList.add('hidden');
+            startGameButton.classList.add('hidden');
+            endGameButton.classList.remove('hidden');
+            gameBoard.classList.remove('hidden');
+        }
+
+        // 结束游戏
+        function endGame() {
+            clearInterval(timer);
+            bgMusic.pause(); // 停止背景音乐
+            let prize = '三等奖';
+            if (score >= 30) prize = '一等奖';
+            else if (score >= 20) prize = '二等奖';
+            alert('游戏结束！您的得分是: ' + score + '，获得' + prize);
+            updateHighScore();
+
+            // 重置得分和时间
+            score = 0;
+            timeLeft = 60;
+            scoreDisplay.textContent = score;
+            timerDisplay.textContent = timeLeft;
+
+            // 显示选择和开始按钮
+            modeSelect.parentElement.classList.remove('hidden');
+            difficultySelect.parentElement.classList.remove('hidden');
+            startGameButton.classList.remove('hidden');
+            endGameButton.classList.add('hidden');
+            gameBoard.classList.add('hidden');
+        }
+
+        // 更新历史最高分
+        function updateHighScore() {
+            const highScore = localStorage.getItem('highScore') || 0;
+            if (score > highScore) {
+                localStorage.setItem('highScore', score);
+                highScoreDisplay.textContent = score;
+            }
+        }
+
+        // 加载历史最高分
+        function loadHighScore() {
+            const highScore = localStorage.getItem('highScore') || 0;
+            highScoreDisplay.textContent = highScore;
+        }
+
+        // 清除历史记录
+        clearHistoryButton.addEventListener('click', () => {
+            localStorage.removeItem('highScore');
+            highScoreDisplay.textContent = 0;
+        });
+
+        // 绑定按钮事件
+        startGameButton.addEventListener('click', startGame);
+        endGameButton.addEventListener('click', endGame);
+
+        // 初始化加载历史最高分
+        loadHighScore();
+    </script>
+</body>
+
+</html> 
